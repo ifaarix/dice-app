@@ -2,54 +2,164 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Prevents double-tap zooming on iOS to protect the secret triggers -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Dice App</title>
+    
+    <!-- iOS Standalone App Configuration -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Dice App">
+    
+    <!-- Direct internet links to a 512px dice icon for the home screen -->
+    <link rel="apple-touch-icon" href="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/Dice-6-b.svg/512px-Dice-6-b.svg.png">
+    <link rel="icon" type="image/png" href="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/Dice-6-b.svg/512px-Dice-6-b.svg.png">
+    
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@800&display=swap');
+
+        body { font-family: 'Poppins', sans-serif; }
+
+        /* 3D Scene and Cube */
+        .scene {
+            width: 140px;
+            height: 140px;
+            perspective: 800px;
+        }
+        
+        .cube {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+            /* 3.5 second smooth rolling animation */
+            transition: transform 3.5s cubic-bezier(0.15, 0.85, 0.3, 1);
+        }
+
+        /* Dice Faces */
+        .face {
+            position: absolute;
+            width: 140px;
+            height: 140px;
+            background-color: #ffffff;
+            border: 2px solid #e2e8f0;
+            border-radius: 20px;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.08), 0 10px 20px rgba(0,0,0,0.1);
+            display: flex;
+            padding: 24px;
+        }
+
+        /* 3D Positioning */
+        .front  { transform: rotateY(  0deg) translateZ(70px); }
+        .top    { transform: rotateX(  90deg) translateZ(70px); }
+        .right  { transform: rotateY(  90deg) translateZ(70px); }
+        .left   { transform: rotateY( -90deg) translateZ(70px); }
+        .bottom { transform: rotateX( -90deg) translateZ(70px); }
+        .back   { transform: rotateY( 180deg) translateZ(70px); }
+
+        /* Dot Styling */
+        .dot {
+            width: 28px;
+            height: 28px;
+            background-color: #1e293b;
+            border-radius: 50%;
+            box-shadow: inset 0 3px 6px rgba(0,0,0,0.4);
+        }
+
+        /* Face Layouts (Flexbox) */
+        .face-1 { justify-content: center; align-items: center; }
+        
+        .face-2 { justify-content: space-between; }
+        .face-2 .dot:nth-child(2) { align-self: flex-end; }
+        
+        .face-3 { justify-content: space-between; }
+        .face-3 .dot:nth-child(2) { align-self: center; }
+        .face-3 .dot:nth-child(3) { align-self: flex-end; }
+        
+        .col { display: flex; flex-direction: column; justify-content: space-between; height: 100%; width: 100%; }
+        .face-4, .face-6 { justify-content: space-between; }
+        
+        .face-5 { position: relative; justify-content: space-between; }
+        .face-5 .center-dot { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+    </style>
 </head>
-<body class="h-screen w-screen bg-gray-900 flex items-center justify-center relative overflow-hidden select-none touch-none">
+<body class="h-screen w-screen bg-slate-900 flex flex-col items-center justify-center relative overflow-hidden select-none touch-none">
 
-    <!-- Invisible Preload Triggers (Double tap to queue the roll) -->
-    <!-- Top Left queues a 1 -->
-    <div id="trigger-1" class="absolute top-0 left-0 w-24 h-24 z-10"></div>
-    <!-- Top Right queues a 6 -->
-    <div id="trigger-6" class="absolute top-0 right-0 w-24 h-24 z-10"></div>
+    <!-- App Header -->
+    <h1 class="absolute top-16 text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-br from-indigo-400 to-cyan-300 drop-shadow-md tracking-widest uppercase z-20">
+        Dice App
+    </h1>
 
-    <!-- The Dice -->
-    <div id="dice" class="bg-white rounded-3xl w-40 h-40 flex items-center justify-center text-7xl font-bold cursor-pointer shadow-[0_0_40px_rgba(255,255,255,0.2)] transition-transform active:scale-90">
-        🎲
+    <!-- Invisible Preload Triggers -->
+    <!-- Top Left double-tap queues a 1 -->
+    <div id="trigger-1" class="absolute top-0 left-0 w-32 h-32 z-30"></div>
+    <!-- Top Right double-tap queues a 6 -->
+    <div id="trigger-6" class="absolute top-0 right-0 w-32 h-32 z-30"></div>
+
+    <!-- The 3D Dice -->
+    <div class="scene cursor-pointer z-10" id="dice-container">
+        <div class="cube" id="cube">
+            <!-- Face 1 -->
+            <div class="face front face-1"><div class="dot"></div></div>
+            <!-- Face 2 -->
+            <div class="face top face-2"><div class="dot"></div><div class="dot"></div></div>
+            <!-- Face 3 -->
+            <div class="face right face-3"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+            <!-- Face 4 -->
+            <div class="face left face-4">
+                <div class="col"><div class="dot"></div><div class="dot"></div></div>
+                <div class="col items-end"><div class="dot"></div><div class="dot"></div></div>
+            </div>
+            <!-- Face 5 -->
+            <div class="face bottom face-5">
+                <div class="col"><div class="dot"></div><div class="dot"></div></div>
+                <div class="dot center-dot"></div>
+                <div class="col items-end"><div class="dot"></div><div class="dot"></div></div>
+            </div>
+            <!-- Face 6 -->
+            <div class="face back face-6">
+                <div class="col"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+                <div class="col items-end"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+            </div>
+        </div>
     </div>
 
     <script>
-        const dice = document.getElementById('dice');
+        const diceContainer = document.getElementById('dice-container');
+        const cube = document.getElementById('cube');
         const trigger1 = document.getElementById('trigger-1');
         const trigger6 = document.getElementById('trigger-6');
 
         let queuedRoll = null;
         let tiltModifier = null;
         let permissionGranted = false;
+        let isRolling = false;
+        
+        let currentSpinX = 0;
+        let currentSpinY = 0;
+
+        // Map required rotations to show a specific face
+        const faceRotations = {
+            1: { x: 0, y: 0 },         // Front face
+            2: { x: -90, y: 0 },       // Top face
+            3: { x: 0, y: -90 },       // Right face
+            4: { x: 0, y: 90 },        // Left face
+            5: { x: 90, y: 0 },        // Bottom face
+            6: { x: 180, y: 0 }        // Back face
+        };
 
         // 1. Preload Logic
-        trigger1.addEventListener('dblclick', (e) => { 
-            queuedRoll = 1; 
-            e.preventDefault(); 
-        });
-        
-        trigger6.addEventListener('dblclick', (e) => { 
-            queuedRoll = 6; 
-            e.preventDefault(); 
-        });
+        trigger1.addEventListener('dblclick', (e) => { queuedRoll = 1; e.preventDefault(); });
+        trigger6.addEventListener('dblclick', (e) => { queuedRoll = 6; e.preventDefault(); });
 
-        // 2. Device Tilt Logic
+        // 2. Device Tilt Logic (Even/Odd Rigging)
         async function requestOrientationPermission() {
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                 try {
                     const permissionState = await DeviceOrientationEvent.requestPermission();
-                    if (permissionState === 'granted') {
-                        permissionGranted = true;
-                    }
-                } catch (error) {
-                    console.error(error);
-                }
+                    if (permissionState === 'granted') permissionGranted = true;
+                } catch (error) { console.error(error); }
             } else {
                 permissionGranted = true;
             }
@@ -57,47 +167,51 @@
 
         window.addEventListener('deviceorientation', (event) => {
             const beta = event.beta; // Front-to-back tilt
-            
             if (beta > 60) {
-                tiltModifier = 'high'; // Tilted towards you
+                tiltModifier = 'even'; // Tilted towards you
             } else if (beta < 30) {
-                tiltModifier = 'low';  // Tilted away from you
+                tiltModifier = 'odd';  // Tilted downwards/away
             } else {
-                tiltModifier = null;   // Neutral/Flat
+                tiltModifier = null;   // Flat/neutral
             }
         });
 
-        // 3. Roll Logic
-        dice.addEventListener('click', async () => {
-            // iOS requires user interaction to grant sensor permissions
-            if (!permissionGranted) {
-                await requestOrientationPermission();
-            }
+        // 3. Roll Animation & Resolution Logic
+        diceContainer.addEventListener('click', async () => {
+            if (isRolling) return; 
+            
+            // iOS requirement to enable sensors on first tap
+            if (!permissionGranted) await requestOrientationPermission();
 
-            // Quick visual animation
-            dice.style.transform = 'rotate(360deg) scale(0.8)';
-            setTimeout(() => {
-                dice.style.transform = 'rotate(0deg) scale(1)';
-            }, 150);
-
+            isRolling = true;
             let result;
 
-            // Resolve the triggers
+            // Resolve the Rigged Triggers
             if (queuedRoll !== null) {
                 result = queuedRoll;
-                queuedRoll = null; // Reset after using
-            } else if (tiltModifier === 'high') {
-                result = Math.floor(Math.random() * 2) + 5; // Forces 5 or 6
-            } else if (tiltModifier === 'low') {
-                result = Math.floor(Math.random() * 2) + 1; // Forces 1 or 2
+                queuedRoll = null; // Reset after use
+            } else if (tiltModifier === 'even') {
+                result = (Math.floor(Math.random() * 3) + 1) * 2; // Forces 2, 4, or 6
+            } else if (tiltModifier === 'odd') {
+                result = (Math.floor(Math.random() * 3) * 2) + 1; // Forces 1, 3, or 5
             } else {
-                result = Math.floor(Math.random() * 6) + 1; // Standard 1-6
+                result = Math.floor(Math.random() * 6) + 1; // True random fallback
             }
 
-            // Update dice face
+            // 1800 degrees = 5 full dramatic spins in the air
+            currentSpinX += 1800;
+            currentSpinY += 1800;
+
+            // Apply base spins + the exact angle needed to land on the rigged face
+            const targetX = currentSpinX + faceRotations[result].x;
+            const targetY = currentSpinY + faceRotations[result].y;
+
+            cube.style.transform = `rotateX(${targetX}deg) rotateY(${targetY}deg)`;
+
+            // Unlock the dice after the 3.5s CSS transition finishes
             setTimeout(() => {
-                dice.innerText = result;
-            }, 150);
+                isRolling = false;
+            }, 3500); 
         });
     </script>
 </body>
