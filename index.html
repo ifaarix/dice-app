@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dice App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="h-screen w-screen bg-gray-900 flex items-center justify-center relative overflow-hidden select-none touch-none">
+
+    <!-- Invisible Preload Triggers (Double tap to queue the roll) -->
+    <!-- Top Left queues a 1 -->
+    <div id="trigger-1" class="absolute top-0 left-0 w-24 h-24 z-10"></div>
+    <!-- Top Right queues a 6 -->
+    <div id="trigger-6" class="absolute top-0 right-0 w-24 h-24 z-10"></div>
+
+    <!-- The Dice -->
+    <div id="dice" class="bg-white rounded-3xl w-40 h-40 flex items-center justify-center text-7xl font-bold cursor-pointer shadow-[0_0_40px_rgba(255,255,255,0.2)] transition-transform active:scale-90">
+        🎲
+    </div>
+
+    <script>
+        const dice = document.getElementById('dice');
+        const trigger1 = document.getElementById('trigger-1');
+        const trigger6 = document.getElementById('trigger-6');
+
+        let queuedRoll = null;
+        let tiltModifier = null;
+        let permissionGranted = false;
+
+        // 1. Preload Logic
+        trigger1.addEventListener('dblclick', (e) => { 
+            queuedRoll = 1; 
+            e.preventDefault(); 
+        });
+        
+        trigger6.addEventListener('dblclick', (e) => { 
+            queuedRoll = 6; 
+            e.preventDefault(); 
+        });
+
+        // 2. Device Tilt Logic
+        async function requestOrientationPermission() {
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                try {
+                    const permissionState = await DeviceOrientationEvent.requestPermission();
+                    if (permissionState === 'granted') {
+                        permissionGranted = true;
+                    }
+                } catch (error) {
+                    console.error(error);
+                }
+            } else {
+                permissionGranted = true;
+            }
+        }
+
+        window.addEventListener('deviceorientation', (event) => {
+            const beta = event.beta; // Front-to-back tilt
+            
+            if (beta > 60) {
+                tiltModifier = 'high'; // Tilted towards you
+            } else if (beta < 30) {
+                tiltModifier = 'low';  // Tilted away from you
+            } else {
+                tiltModifier = null;   // Neutral/Flat
+            }
+        });
+
+        // 3. Roll Logic
+        dice.addEventListener('click', async () => {
+            // iOS requires user interaction to grant sensor permissions
+            if (!permissionGranted) {
+                await requestOrientationPermission();
+            }
+
+            // Quick visual animation
+            dice.style.transform = 'rotate(360deg) scale(0.8)';
+            setTimeout(() => {
+                dice.style.transform = 'rotate(0deg) scale(1)';
+            }, 150);
+
+            let result;
+
+            // Resolve the triggers
+            if (queuedRoll !== null) {
+                result = queuedRoll;
+                queuedRoll = null; // Reset after using
+            } else if (tiltModifier === 'high') {
+                result = Math.floor(Math.random() * 2) + 5; // Forces 5 or 6
+            } else if (tiltModifier === 'low') {
+                result = Math.floor(Math.random() * 2) + 1; // Forces 1 or 2
+            } else {
+                result = Math.floor(Math.random() * 6) + 1; // Standard 1-6
+            }
+
+            // Update dice face
+            setTimeout(() => {
+                dice.innerText = result;
+            }, 150);
+        });
+    </script>
+</body>
+</html>
