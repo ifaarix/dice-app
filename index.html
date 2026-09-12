@@ -29,13 +29,15 @@
             height: 100%;
             position: relative;
             transform-style: preserve-3d;
+            /* Explicit start state prevents the first-roll visual glitch */
+            transform: rotateX(0deg) rotateY(0deg); 
             transition: transform 3.5s cubic-bezier(0.15, 0.85, 0.3, 1);
         }
 
         .face {
             position: absolute;
-            top: 0; /* Fixes visual stacking error */
-            left: 0; /* Fixes visual stacking error */
+            top: 0;
+            left: 0;
             width: 140px;
             height: 140px;
             background-color: #ffffff;
@@ -81,8 +83,8 @@
 
     <!-- Interactive Header -->
     <h1 class="absolute top-16 text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-br from-indigo-400 to-cyan-300 drop-shadow-md tracking-widest uppercase z-20 flex gap-4">
-        <span id="trigger-dice">DICE</span>
-        <span id="trigger-app">APP</span>
+        <span id="trigger-dice" class="cursor-pointer px-2 z-30">DICE</span>
+        <span id="trigger-app" class="cursor-pointer px-2 z-30">APP</span>
     </h1>
 
     <div class="scene cursor-pointer z-10" id="dice-container">
@@ -130,9 +132,9 @@
         // 1. Text Preload Logic (Double Tap)
         function setupDoubleTap(elementId, category) {
             let lastTap = 0;
-            document.getElementById(elementId).addEventListener('click', () => {
+            document.getElementById(elementId).addEventListener('click', (e) => {
                 const now = Date.now();
-                if (now - lastTap < 400) { // 400ms window for double tap
+                if (now - lastTap < 400) { 
                     queuedCategory = category;
                 }
                 lastTap = now;
@@ -146,15 +148,15 @@
         function startOrientationTracking() {
             window.addEventListener('deviceorientation', (event) => {
                 const beta = event.beta;
-                // Stop if sensor is empty/null to prevent the "always odd" bug
                 if (beta === null) return; 
 
-                if (beta > 55) {
-                    tiltModifier = 'even';
-                } else if (beta < 35) {
-                    tiltModifier = 'odd'; 
+                // 90 = vertical (facing you), 0 = completely flat on table
+                if (beta > 60) {
+                    tiltModifier = 'even'; // Tilted steeply up
+                } else if (beta < 30) {
+                    tiltModifier = 'odd';  // Tilted heavily down/flat
                 } else {
-                    tiltModifier = null; 
+                    tiltModifier = null;   // Normal viewing angle (Random)
                 }
             });
         }
@@ -174,17 +176,15 @@
             }
         }
 
-        // Start tracking immediately for non-iOS devices
-        if (typeof DeviceOrientationEvent === 'undefined' || typeof DeviceOrientationEvent.requestPermission !== 'function') {
-            startOrientationTracking();
-            permissionGranted = true;
-        }
-
         // 3. Roll Animation & Resolution Logic
         diceContainer.addEventListener('click', async () => {
             if (isRolling) return; 
             
-            if (!permissionGranted) await requestOrientationPermission();
+            if (!permissionGranted) {
+                await requestOrientationPermission();
+                // Pause for 250ms to allow gyro hardware to grab the current tilt
+                await new Promise(resolve => setTimeout(resolve, 250));
+            }
 
             isRolling = true;
             let result;
@@ -203,6 +203,7 @@
                 result = Math.floor(Math.random() * 6) + 1; 
             }
 
+            // Add 1800 degrees (5 full spins) to current state
             currentSpinX += 1800;
             currentSpinY += 1800;
 
